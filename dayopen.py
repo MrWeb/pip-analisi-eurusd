@@ -24,6 +24,7 @@ for index, row_open in df_start.iterrows():
     # Estrai il prezzo di apertura
     open_price = row_open['Open']
     open_time_formatted = row_open['Gmt time'].strftime('%d/%m/%Y %H:%M')
+    open_time_formatted_time_only = row_open['Gmt time'].strftime('%H:%M')
 
     # Trova la candela corrispondente di chiusura nello stesso giorno
     same_day_end = df_end[df_end['Gmt time'].dt.date == row_open['Gmt time'].date()]
@@ -32,6 +33,7 @@ for index, row_open in df_start.iterrows():
         # Estrai il prezzo di chiusura delle 14:00
         close_price = same_day_end.iloc[0]['Close']
         close_time_formatted = same_day_end.iloc[0]['Gmt time'].strftime('%d/%m/%Y %H:%M')
+        close_time_formatted_time_only = same_day_end.iloc[0]['Gmt time'].strftime('%H:%M')
 
         # Calcola la differenza in pips
         pips_difference = (close_price - open_price) / pip_factor
@@ -81,6 +83,7 @@ if total_count > 0:
     # Stampa le percentuali, le medie dei pips e gli anni
 
     print(f"")
+    print(f"\nResoconto settimanale per file \033[93m{file_name}\033[0m fascia oraria \033[93m{open_time_formatted_time_only}-{close_time_formatted_time_only}\033[0m:")
     print(f"\033[92m{bullish_percentage:.2f}% Bullish\033[0m [{bullish_pip_avg:.2f} pips]")
     print(f"\033[91m{bearish_percentage:.2f}% Bearish\033[0m [{bearish_pip_avg:.2f} pips]")
 else:

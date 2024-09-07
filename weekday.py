@@ -67,7 +67,7 @@ for index, row_open in df_start.iterrows():
         print(f"GMT: {row_open['Gmt time']} - Candela di chiusura mancante.")
 
 # Stampa il resoconto settimanale
-print("\nResoconto settimanale:")
+print(f"\nResoconto settimanale per file \033[93m{file_name}\033[0m fascia oraria \033[93m{open_time_formatted_time_only}-{close_time_formatted_time_only}\033[0m:")
 total_count = 0  # Contatore totale per calcolare gli anni
 
 for day in day_stats:
