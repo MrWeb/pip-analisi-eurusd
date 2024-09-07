@@ -117,6 +117,10 @@ for index, row_open in df_start.iterrows():
 
 # Stampa il resoconto settimanale
 print(f"\nResoconto settimanale per file \033[93m{file_name}\033[0m fascia oraria \033[93m{open_time_formatted_time_only}-{close_time_formatted_time_only}\033[0m:")
+
+if file_name == 'vix.csv':
+    print(f"\033[93mATTENZIONE: STAI CONFRONTANDO IL VIX CON IL VIX STESSO, I DATI SONO CORRETTI MA I PUNTEGGI VIX VANNO IGNORATI \033[0m")
+
 total_count = 0  # Contatore totale per calcolare gli anni
 
 for day in day_stats:
@@ -169,7 +173,7 @@ if highest_percentage_day:
 
 # VIX data missing
 if missing_vix_days > 0:
-    print(f"\033[91mVIX assente in alcuni giorni: {missing_vix_days} ({missing_vix_days / total_count * 100:.2f}% dei dati analizzati senza VIX)\033[0m")
+    print(f"\033[93mVIX assente in alcuni giorni: {missing_vix_days} ({missing_vix_days / total_count * 100:.2f}% dei dati analizzati senza VIX)\033[0m")
 
 # Calcolo degli anni e stampa finale
 if total_count > 0:
