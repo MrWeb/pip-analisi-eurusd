@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Configurazione delle variabili
-file_name = 'vix.csv'
+file_name = 'usdjpy.csv'
 start_time = '13:00:00' # GMT
 end_time = '19:00:00' # GMT
 pip_factor = 0.01 # Da cambiare a seconda dello strumento

@@ -99,14 +99,14 @@ for day in day_stats:
             if bullish_percentage > highest_percentage:
                 highest_percentage = bullish_percentage
                 highest_percentage_day = day
-                highest_action = f"\033[92mBUY {highest_percentage_day} at {open_time_formatted_time_only} close at {close_time_formatted_time_only} GMT\033[0m"
+                highest_action = f"\033[92m{highest_percentage_day}: BUY at {open_time_formatted_time_only} close at {close_time_formatted_time_only} GMT\033[0m"
         else:
             print(f"{day}: \033[91m{bearish_percentage:.2f}% Bearish\033[0m [{bearish_pip_avg:.2f} pip] {prefix}")
             # Aggiorna la percentuale più alta se necessario
             if bearish_percentage > highest_percentage:
                 highest_percentage = bearish_percentage
                 highest_percentage_day = day
-                highest_action = f"\033[91mSELL {highest_percentage_day} at {open_time_formatted_time_only} close at {close_time_formatted_time_only} GMT\033[0m"
+                highest_action = f"\033[91m{highest_percentage_day}: SELL at {open_time_formatted_time_only} close at {close_time_formatted_time_only} GMT\033[0m"
     else:
         print(f"{day}: Nessun dato valido trovato.")
 
