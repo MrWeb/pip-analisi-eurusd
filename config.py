@@ -1,10 +1,10 @@
 import pandas as pd
 
 # Configurazione delle variabili
-file_name = 'eurusd.csv'
-start_time = '13:30:00'
-end_time = '14:00:00'
-pip_factor = 0.0001
+file_name = 'vix.csv'
+start_time = '13:00:00' # GMT
+end_time = '19:00:00' # GMT
+pip_factor = 0.01 # Da cambiare a seconda dello strumento
 
 # Funzione per leggere il file
 print(f"Lettura del file {file_name}...")
