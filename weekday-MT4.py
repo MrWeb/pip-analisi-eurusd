@@ -1,13 +1,31 @@
 import pandas as pd
-from config import df, file_name, start_time, end_time, pip_factor
+import os
+from datetime import time
 
-# Filtro orario start
-df_start = df[df['Gmt time'].dt.time == pd.to_datetime(start_time).time()].copy()
-# Filtro orario end
-df_end = df[df['Gmt time'].dt.time == pd.to_datetime(end_time).time()].copy()
+# Configurazione delle variabili
+file_name = 'GBPUSD240.csv'
+start_time = time(0, 0)  # 00:00 GMT
+end_time = time(20, 0)    # 20:00 GMT
+pip_factor = 0.0001 # Da cambiare a seconda dello strumento
+
+# Funzione per leggere il file
+print(f"Lettura del file {file_name}...")
+if os.path.exists(file_name):
+    df = pd.read_csv(file_name, header=None, names=['Date', 'Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+elif os.path.exists('data/' + file_name):
+    df = pd.read_csv('data/' + file_name, header=None, names=['Date', 'Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+else:
+    raise FileNotFoundError(f"\033[91mFile {file_name} non trovato ne qui né nella cartella 'data'\033[0m")
+
+# Combina le colonne Date e Time e converte in datetime
+df['Gmt time'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%Y.%m.%d %H:%M')
+
+# Filtro orario start e end
+df['hour'] = df['Gmt time'].dt.hour
+df_filtered = df[(df['hour'] >= start_time.hour) & (df['hour'] <= end_time.hour)].copy()
 
 # Aggiungi una colonna per il giorno della settimana
-df_start.loc[:, 'Weekday'] = df_start['Gmt time'].dt.day_name()
+df_filtered.loc[:, 'Weekday'] = df_filtered['Gmt time'].dt.day_name()
 
 # Inizializza dizionari per contare i bullish e bearish per ogni giorno della settimana
 day_stats = {day: {'bullish_count': 0, 'bearish_count': 0, 'total_count': 0} for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']}
@@ -23,22 +41,22 @@ trading_days_per_year = 20 * 12  # 20 giorni al mese per 12 mesi
 highest_percentage = -1
 highest_percentage_day = None
 
+# Inizializza le variabili per il formato dell'ora
+open_time_formatted_time_only = start_time.strftime('%H:%M')
+close_time_formatted_time_only = end_time.strftime('%H:%M')
+
 # Assicuriamoci che ci siano candele sia per lo start time sia per l'end time di quel giorno
-for index, row_open in df_start.iterrows():
-    # Estrai il prezzo di apertura
-    open_price = row_open['Open']
-    weekday = row_open['Weekday']
-    open_time_formatted = row_open['Gmt time'].strftime('%d/%m/%Y %H:%M')
-    open_time_formatted_time_only = row_open['Gmt time'].strftime('%H:%M')
+print("\nInizio del ciclo principale...")
+for date, group in df_filtered.groupby(df_filtered['Gmt time'].dt.date):
+    if len(group) >= 2:
+        row_open = group.iloc[0]
+        row_close = group.iloc[-1]
 
-    # Trova la candela corrispondente di chiusura nello stesso giorno
-    same_day_end = df_end[df_end['Gmt time'].dt.date == row_open['Gmt time'].date()]
-
-    if not same_day_end.empty:
-        # Estrai il prezzo di chiusura delle 14:00
-        close_price = same_day_end.iloc[0]['Close']
-        close_time_formatted = same_day_end.iloc[0]['Gmt time'].strftime('%d/%m/%Y %H:%M')
-        close_time_formatted_time_only = same_day_end.iloc[0]['Gmt time'].strftime('%H:%M')
+        open_price = row_open['Open']
+        close_price = row_close['Close']
+        weekday = row_open['Weekday']
+        open_time_formatted = row_open['Gmt time'].strftime('%d/%m/%Y %H:%M')
+        close_time_formatted = row_close['Gmt time'].strftime('%d/%m/%Y %H:%M')
 
         # Calcola la differenza in pips
         pips_difference = (close_price - open_price) / pip_factor
@@ -64,7 +82,7 @@ for index, row_open in df_start.iterrows():
             print(f"[SKIP]: {open_time_formatted} - {close_time_formatted} (GMT) - Differenza pip pari a zero.")
     else:
         # Nel caso in cui manchi la candela di chiusura per quel giorno
-        print(f"GMT: {row_open['Gmt time']} - Candela di chiusura mancante.")
+        print(f"[SKIP]: {date} - Dati insufficienti per l'analisi.")
 
 # Stampa il resoconto settimanale
 print(f"\nResoconto settimanale per file \033[93m{file_name}\033[0m fascia oraria \033[93m{open_time_formatted_time_only}-{close_time_formatted_time_only}\033[0m:")
@@ -117,6 +135,6 @@ if highest_percentage_day:
 # Calcolo degli anni e stampa finale
 if total_count > 0:
     years = total_count / trading_days_per_year
-    print(f"Totale giorni analizzati: {total_count} ({years:.2f} anni)")
+    print(f"\033[93mTotale giorni analizzati: {total_count} ({years:.2f} anni) \033[0m\n")
 else:
     print("\nNessun dato valido trovato.")

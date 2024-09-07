@@ -1,77 +1,65 @@
 import pandas as pd
 from config import df, file_name, start_time, end_time, pip_factor
+import os
 
 # Leggi il file vix.csv e assicurati che la colonna 'Gmt time' sia in formato datetime
-vix_df = pd.read_csv('vix.csv', parse_dates=['Gmt time'])
+if os.path.exists('vix.csv'):
+    vix_df = pd.read_csv('vix.csv', parse_dates=['Gmt time'])
+# Se non esiste, prova a caricarlo da 'data/' + file_name
+elif os.path.exists('data/vix.csv'):
+    vix_df = pd.read_csv('data/vix.csv', parse_dates=['Gmt time'])
+else:
+    raise FileNotFoundError(f"\033[91mFile vix.csv non trovato ne qui né nella cartella 'data'\033[0m")
+
 vix_df['Gmt time'] = pd.to_datetime(vix_df['Gmt time'], format='%d.%m.%Y %H:%M:%S.%f')
 
-# Filtro orario start
-df_start = df[df['Gmt time'].dt.time == pd.to_datetime(start_time).time()].copy()
-# Filtro orario end
-df_end = df[df['Gmt time'].dt.time == pd.to_datetime(end_time).time()].copy()
+# Filtra orario start e end
+df['Gmt time'] = pd.to_datetime(df['Gmt time'])
+df_start = df[df['Gmt time'].dt.time == pd.to_datetime(start_time).time()]
+df_end = df[df['Gmt time'].dt.time == pd.to_datetime(end_time).time()]
 
 # Aggiungi una colonna per il giorno della settimana
-df_start.loc[:, 'Weekday'] = df_start['Gmt time'].dt.day_name()
+df_start['Weekday'] = df_start['Gmt time'].dt.day_name()
 
-# Inizializza dizionari per contare i bullish e bearish per ogni giorno della settimana
-day_stats = {day: {'bullish_count': 0, 'bearish_count': 0, 'total_count': 0, 'vix_score_sum': 0} for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']}
+# Inizializza dizionari per le statistiche
+days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+day_stats = {day: {'bullish_count': 0, 'bearish_count': 0, 'total_count': 0, 'vix_score_sum': 0} for day in days}
+bullish_pip_sum = {day: 0 for day in days}
+bearish_pip_sum = {day: 0 for day in days}
 
-# Somma dei pip per BULLISH e BEARISH
-bullish_pip_sum = {day: 0 for day in day_stats}
-bearish_pip_sum = {day: 0 for day in day_stats}
-
-# Numero di giorni lavorativi in un anno
-trading_days_per_year = 20 * 12  # 20 giorni al mese per 12 mesi
-
-# Variabili per tenere traccia della percentuale più alta
+# Variabili per la percentuale più alta
 highest_percentage = -1
 highest_percentage_day = None
 
 missing_vix_days = 0
-vix_score_total = 0  # Variabile per il punteggio totale del VIX
-vix_count = 0  # Conta il numero di giorni con dati VIX disponibili
+vix_score_total = 0
+vix_count = 0
 
 # Assicuriamoci che ci siano candele sia per lo start time sia per l'end time di quel giorno
 for index, row_open in df_start.iterrows():
-    # Estrai il prezzo di apertura
+    open_time = row_open['Gmt time']
     open_price = row_open['Open']
     weekday = row_open['Weekday']
-    open_time_formatted = row_open['Gmt time'].strftime('%d/%m/%Y %H:%M')
-    open_time_formatted_time_only = row_open['Gmt time'].strftime('%H:%M')
 
-    # Trova la candela corrispondente di chiusura nello stesso giorno
-    same_day_end = df_end[df_end['Gmt time'].dt.date == row_open['Gmt time'].date()]
+    same_day_end = df_end[df_end['Gmt time'].dt.date == open_time.date()]
+    if same_day_end.empty:
+        print(f"GMT: {open_time} - Candela di chiusura mancante. VIX O: {vix_open_price if 'vix_open_price' in locals() else 'missing'}, VIX C: {vix_close_price if 'vix_close_price' in locals() else 'missing'}.")
+        continue
 
-    # Trova il valore di apertura del VIX per la stessa ora e giorno
-    vix_open_value = vix_df[
-        (vix_df['Gmt time'].dt.date == row_open['Gmt time'].date()) &
-        (vix_df['Gmt time'].dt.time == row_open['Gmt time'].time())
-    ]['Open']
+    close_price = same_day_end.iloc[0]['Close']
+    vix_open_value = vix_df[(vix_df['Gmt time'].dt.date == open_time.date()) & (vix_df['Gmt time'].dt.time == open_time.time())]['Open']
+    vix_close_value = vix_df[(vix_df['Gmt time'].dt.date == open_time.date()) & (vix_df['Gmt time'].dt.time == same_day_end.iloc[0]['Gmt time'].time())]['Close']
+
     vix_open_price = vix_open_value.iloc[0] if not vix_open_value.empty else None
-
-    # Trova il valore di chiusura del VIX per la stessa data e ora di chiusura del prezzo
-    vix_close_value = vix_df[
-        (vix_df['Gmt time'].dt.date == row_open['Gmt time'].date()) &
-        (vix_df['Gmt time'].dt.time == same_day_end.iloc[0]['Gmt time'].time())
-    ]['Close']
     vix_close_price = vix_close_value.iloc[0] if not vix_close_value.empty else None
 
-    # Imposta vix_open_price a None se apertura e chiusura sono uguali
-    if vix_open_price is not None and vix_close_price is not None and vix_open_price == vix_close_price:
+    if vix_open_price == vix_close_price:
         vix_open_price = None
 
     if not same_day_end.empty:
-        # Estrai il prezzo di chiusura delle 14:00
-        close_price = same_day_end.iloc[0]['Close']
-        close_time_formatted = same_day_end.iloc[0]['Gmt time'].strftime('%d/%m/%Y %H:%M')
-        close_time_formatted_time_only = same_day_end.iloc[0]['Gmt time'].strftime('%H:%M')
-
-        # Calcola la differenza in pips
         pips_difference = (close_price - open_price) / pip_factor
 
-        # Considera solo i giorni con differenza di pips non zero
         if pips_difference != 0:
-            # Determina se la candela end è "BULLISH" o "BEARISH"
             if close_price > open_price:
                 result = "\033[92mBULLISH\033[0m"
                 day_stats[weekday]['bullish_count'] += 1
@@ -83,101 +71,68 @@ for index, row_open in df_start.iterrows():
 
             day_stats[weekday]['total_count'] += 1
 
-            # Calcola il punteggio del VIX
             if vix_open_price is not None and vix_close_price is not None:
-                if (close_price > open_price and vix_close_price > vix_open_price) or (close_price < open_price and vix_close_price < vix_open_price):
-                    vix_score = -1
-                elif (close_price > open_price and vix_close_price < vix_open_price) or (close_price < open_price and vix_close_price > vix_open_price):
-                    vix_score = 1
-                else:
-                    vix_score = 0
-
-                # Aggiungi il punteggio del VIX al totale per il giorno corrente
+                vix_score = -1 if (close_price > open_price) == (vix_close_price > vix_open_price) else 1 if (close_price > open_price) != (vix_close_price > vix_open_price) else 0
                 day_stats[weekday]['vix_score_sum'] += vix_score
                 vix_score_total += vix_score
                 vix_count += 1
 
-                # Stampa il risultato con i valori di apertura e chiusura del VIX
-                print(f"[{result}]: {open_time_formatted} - {close_time_formatted} (GMT): O: {open_price}, C: {close_price}, pips: {pips_difference:.1f} - VIX O: {vix_open_price}, VIX C: {vix_close_price}, VIX Score: {vix_score}")
+                print(f"[{result}]: {open_time.strftime('%d/%m/%Y %H:%M')} - {same_day_end.iloc[0]['Gmt time'].strftime('%d/%m/%Y %H:%M')} (GMT): O: {open_price}, C: {close_price}, pips: {pips_difference:.1f} - VIX O: {vix_open_price}, VIX C: {vix_close_price}, VIX Score: {vix_score}")
             else:
                 missing_vix_days += 1
-                print(f"[{result}]: {open_time_formatted} - {close_time_formatted} (GMT): O: {open_price}, C: {close_price}, Pips: {pips_difference:.1f} - VIX data missing.")
+                print(f"[{result}]: {open_time.strftime('%d/%m/%Y %H:%M')} - {same_day_end.iloc[0]['Gmt time'].strftime('%d/%m/%Y %H:%M')} (GMT): O: {open_price}, C: {close_price}, Pips: {pips_difference:.1f} - VIX data missing.")
         else:
-            # Nel caso in cui la differenza di pip sia zero
             if vix_open_price is not None and vix_close_price is not None:
-                print(f"[SKIP]: {open_time_formatted} - {close_time_formatted} (GMT) - Differenza pip pari a zero. VIX O: {vix_open_price}, VIX C: {vix_close_price}.")
+                print(f"[SKIP]: {open_time.strftime('%d/%m/%Y %H:%M')} - {same_day_end.iloc[0]['Gmt time'].strftime('%d/%m/%Y %H:%M')} (GMT) - Differenza pip pari a zero. VIX O: {vix_open_price}, VIX C: {vix_close_price}.")
             else:
-                print(f"[SKIP]: {open_time_formatted} - {close_time_formatted} (GMT) - Differenza pip pari a zero. VIX non si è mosso.")
+                print(f"[SKIP]: {open_time.strftime('%d/%m/%Y %H:%M')} - {same_day_end.iloc[0]['Gmt time'].strftime('%d/%m/%Y %H:%M')} (GMT) - Differenza pip pari a zero. VIX non si è mosso.")
     else:
-        # Nel caso in cui manchi la candela di chiusura per quel giorno
-        if vix_open_price is not None and vix_close_price is not None:
-            print(f"GMT: {row_open['Gmt time']} - Candela di chiusura mancante. VIX O: {vix_open_price}, VIX C: {vix_close_price}.")
-        else:
-            print(f"GMT: {row_open['Gmt time']} - Candela di chiusura mancante. VIX data missing.")
+        print(f"GMT: {open_time} - Candela di chiusura mancante. VIX O: {vix_open_price if 'vix_open_price' in locals() else 'missing'}, VIX C: {vix_close_price if 'vix_close_price' in locals() else 'missing'}.")
 
 # Stampa il resoconto settimanale
-print(f"\nResoconto settimanale per file \033[93m{file_name}\033[0m fascia oraria \033[93m{open_time_formatted_time_only}-{close_time_formatted_time_only}\033[0m:")
+print(f"\nResoconto settimanale per file \033[93m{file_name}\033[0m fascia oraria \033[93m{start_time}-{end_time}\033[0m:")
 
 if file_name == 'vix.csv':
     print(f"\033[93mATTENZIONE: STAI CONFRONTANDO IL VIX CON IL VIX STESSO, I DATI SONO CORRETTI MA I PUNTEGGI VIX VANNO IGNORATI \033[0m")
 
-total_count = 0  # Contatore totale per calcolare gli anni
+total_count = sum(stats['total_count'] for stats in day_stats.values())
 
-for day in day_stats:
-    stats = day_stats[day]
+for day, stats in day_stats.items():
     if stats['total_count'] > 0:
         bullish_percentage = (stats['bullish_count'] / stats['total_count']) * 100
         bearish_percentage = (stats['bearish_count'] / stats['total_count']) * 100
 
-        # Media dei pips
         bullish_pip_avg = bullish_pip_sum[day] / stats['bullish_count'] if stats['bullish_count'] > 0 else 0
         bearish_pip_avg = bearish_pip_sum[day] / stats['bearish_count'] if stats['bearish_count'] > 0 else 0
 
-        # Calcola il punteggio medio del VIX per il giorno
-        vix_score_sum = stats['vix_score_sum']
         vix_score_avg = stats['vix_score_sum'] / stats['total_count']
 
-        # Somma il numero totale di giorni analizzati
-        total_count += stats['total_count']
-
-        # Differenza straordinaria
-        diff = 29
-        extraordinary = False
-        if abs(bullish_percentage - bearish_percentage) > diff:
-            extraordinary = True
-
-        # Aggiungi l'asterisco se extraordinary è True
+        extraordinary = abs(bullish_percentage - bearish_percentage) > 29
         prefix = "🎉" if extraordinary else ""
 
-        # Stampa le percentuali, le medie dei pips e il punteggio medio del VIX
         if bullish_percentage > bearish_percentage:
-            print(f"{day}: \033[92m{bullish_percentage:.2f}% Bullish\033[0m [{bullish_pip_avg:.2f} pip] • punteggio VIX: {vix_score_sum:.2f}, media VIX: {vix_score_avg:.2f} {prefix}")
-            # Aggiorna la percentuale più alta se necessario
+            print(f"{day}: \033[92m{bullish_percentage:.2f}% Bullish\033[0m [{bullish_pip_avg:.2f} pip] • punteggio VIX: {stats['vix_score_sum']:.2f}, media VIX: {vix_score_avg:.2f} {prefix}")
             if bullish_percentage > highest_percentage:
                 highest_percentage = bullish_percentage
                 highest_percentage_day = day
-                highest_action = f"\033[92m{highest_percentage_day}: BUY at {open_time_formatted_time_only} close at {close_time_formatted_time_only} GMT\033[0m"
+                highest_action = f"\033[92m{highest_percentage_day}: BUY at {start_time} close at {end_time} GMT\033[0m"
         else:
-            print(f"{day}: \033[91m{bearish_percentage:.2f}% Bearish\033[0m [{bearish_pip_avg:.2f} pip] • punteggio VIX: {vix_score_sum:.2f}, media VIX: {vix_score_avg:.2f} {prefix}")
-            # Aggiorna la percentuale più alta se necessario
+            print(f"{day}: \033[91m{bearish_percentage:.2f}% Bearish\033[0m [{bearish_pip_avg:.2f} pip] • punteggio VIX: {stats['vix_score_sum']:.2f}, media VIX: {vix_score_avg:.2f} {prefix}")
             if bearish_percentage > highest_percentage:
                 highest_percentage = bearish_percentage
                 highest_percentage_day = day
-                highest_action = f"\033[91m{highest_percentage_day}: SELL at {open_time_formatted_time_only} close at {close_time_formatted_time_only} GMT\033[0m"
+                highest_action = f"\033[91m{highest_percentage_day}: SELL at {start_time} close at {end_time} GMT\033[0m"
     else:
         print(f"{day}: Nessun dato valido trovato.")
 
-# Stampa il giorno con la percentuale più alta
 if highest_percentage_day:
     print(f"\n{highest_action}")
 
-# VIX data missing
 if missing_vix_days > 0:
     print(f"\033[93mVIX assente in alcuni giorni: {missing_vix_days} ({missing_vix_days / total_count * 100:.2f}% dei dati analizzati senza VIX)\033[0m")
 
-# Calcolo degli anni e stampa finale
 if total_count > 0:
-    years = total_count / trading_days_per_year
+    years = total_count / (20 * 12)
     print(f"\nTotale giorni analizzati: {total_count} ({years:.2f} anni)")
 else:
     print("\nNessun dato valido trovato.")
