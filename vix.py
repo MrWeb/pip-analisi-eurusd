@@ -147,14 +147,14 @@ for day in day_stats:
 
         # Stampa le percentuali, le medie dei pips e il punteggio medio del VIX
         if bullish_percentage > bearish_percentage:
-            print(f"{day}: \033[92m{bullish_percentage:.2f}% Bullish\033[0m [{bullish_pip_avg:.2f} pip], Punteggio VIX: {vix_score_sum:.2f}, media :{vix_score_avg:.2f} {prefix}")
+            print(f"{day}: \033[92m{bullish_percentage:.2f}% Bullish\033[0m [{bullish_pip_avg:.2f} pip] • punteggio VIX: {vix_score_sum:.2f}, media VIX: {vix_score_avg:.2f} {prefix}")
             # Aggiorna la percentuale più alta se necessario
             if bullish_percentage > highest_percentage:
                 highest_percentage = bullish_percentage
                 highest_percentage_day = day
                 highest_action = f"\033[92m{highest_percentage_day}: BUY at {open_time_formatted_time_only} close at {close_time_formatted_time_only} GMT\033[0m"
         else:
-            print(f"{day}: \033[91m{bearish_percentage:.2f}% Bearish\033[0m [{bearish_pip_avg:.2f} pip], Punteggio medio VIX: {vix_score_avg:.2f} {prefix}")
+            print(f"{day}: \033[91m{bearish_percentage:.2f}% Bearish\033[0m [{bearish_pip_avg:.2f} pip] • punteggio VIX: {vix_score_sum:.2f}, media VIX: {vix_score_avg:.2f} {prefix}")
             # Aggiorna la percentuale più alta se necessario
             if bearish_percentage > highest_percentage:
                 highest_percentage = bearish_percentage
